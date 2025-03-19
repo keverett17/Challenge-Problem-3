@@ -1,6 +1,9 @@
+import sys
 from controller import Supervisor, Motor, Robot,PositionSensor
 import math
 import numpy as np
+import roboticstoolbox as rtb
+from spatialmath import SE3
 # Initialize the robot and supervisor
 robot=Supervisor()
 
@@ -22,6 +25,7 @@ sensors = []
 # Set initial speed and position for joint motors
 for name in joint_names:
     joint = robot.getDevice(name)  # Get the motor device for the joint
+    print(joint)
     joint.setPosition(float('inf'))  # Set joint to position control mode (infinite position control)
     joint.setVelocity(0.25)
     
@@ -73,6 +77,18 @@ def find_xz_list():
     x=np.concatenate((x_1,x_2,x_3,x_4,[np.nan],ux1,ux2,ux3,ux4,ux5,ux6,ux7,ux8))
     z=np.concatenate((z_1,z_2,z_3,z_4,[np.nan],uz1,uz2,uz3,uz4,uz5,uz6,uz7,uz8))
 
+
+def find_joint_pos(points):
+    rbt = rtb.models.Panda()
+    print(rbt)
+    joint_angles=[]
+    for point in points:
+      Tep = SE3.Trans(0.6, -0.3, 0.1) * SE3.OA([0, 1, 0], [0, 0, -1])
+      sol = robot.ik_LM(Tep)         # solve IK
+      joint_angles.append(sol[0])
+      
+    return joint_angles
+
 #This function moves the joints into the correct position
 def set_joints(target_positions,tolerance):
    
@@ -86,7 +102,6 @@ def set_joints(target_positions,tolerance):
         
     # Check if all errors are within tolerance. If yes return True 
    if all(error < tolerance for error in errors):
-       print("All joints reached target positions!")
        return True
     
     
@@ -95,22 +110,30 @@ def set_joints(target_positions,tolerance):
 def main():
     #Define tolerance for error in joint positions (used in setjoints function)
     tolerance=0.01
+    points=find_xz_list()
+    print(points)
+    target_poistions=find_joint_angles(points)
+    print(target_positions)
+    for target in target_positions:
+        target[6]=target[6]-1.6
     while robot.step(timestep) != -1:
-        
-        target_positions = [0.5, -0.5, 0.3, -0.7, 0.1, 0.0, 0.0]  # Desired joint angles in radians(Just an example)
-        
-        if set_joints(target_positions,tolerance):
-            for i,sensor in enumerate(sensors):
-                print(i,sensor.getValue())
-                #The next part we need to do is use inverse kinematics to find the necessary joint positions
-                #Then we will update the neew joint positions and iterate again 
+        move=target_positions.pop(0)  # Desired joint angles in radians(Just an example)
                 
-                #target_positions=[set new target positions here]
-        
+        while target_positions:
+       
+            move=target_positions.pop(0)  # Desired joint angles in radians(Just an example)
+            
+            if set_joints(move,tolerance):
+                print("joint set")
+                move=target_positions.pop(0)
+                    
+                    
+            
         
         
         pass  # Let the simulation run
       
-main()
+if __name__=="__main__":
+    main()
         
  
